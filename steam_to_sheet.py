@@ -9,19 +9,56 @@ def get_steam_item_price(appid, market_hash_name):
         "currency": 1,  # USD
         "market_hash_name": market_hash_name
     }
+    
     try:
-        print(f"Fetching price for {market_hash_name}...")  # 진행 상태 출력
+        # 가격 정보 가져오기
         response = requests.get(base_url, params=params)
-        response.raise_for_status()
-        data = response.json()
-        print(f"Price for {market_hash_name}: {data['lowest_price']}")  # 가격 출력
-        return float(data['lowest_price'].replace('$', '').replace(',', ''))
+        response.raise_for_status()  # 요청이 성공적인지 확인
+        
+        data = response.json()  # JSON 형식으로 응답 데이터 받기
+        
+        # 가격 정보가 있으면 반환
+        if "lowest_price" in data:
+            price = data["lowest_price"]
+            print(f"Price for {market_hash_name}: {price}")
+            # '$' 기호 제거하고 숫자 값만 반환
+            return float(price.replace('$', '').replace(',', ''))
+        else:
+            print(f"No price data available for {market_hash_name}")
+            return None
     except Exception as e:
-        print(f"Error fetching price: {e}")
+        print(f"Error fetching price for {market_hash_name}: {e}")
         return None
+        
+def get_item_quantity(steam_id, app_id, context_id, target_item_name):
+    url = f"https://steamcommunity.com/inventory/{steam_id}/{app_id}/{context_id}/"
+    response = requests.get(url)
+    
+    if response.status_code == 200:
+        data = response.json()
+        item_counts = {}
+        
+        # assets에서 각 아이템의 수량 계산
+        for asset in data["assets"]:
+            item_id = asset["classid"]
+            amount = int(asset["amount"]) if isinstance(asset["amount"], str) else asset["amount"]
+            
+            if item_id not in item_counts:
+                item_counts[item_id] = 0
+            item_counts[item_id] += amount
+        
+        # descriptions에서 아이템을 찾아 수량 반환
+        for item in data["descriptions"]:
+            if item["market_hash_name"] == target_item_name:
+                item_id = item["classid"]
+                quantity = item_counts.get(item_id, 0)  # 해당 아이템의 수량
+                return quantity
+    else:
+        print(f"Failed to fetch inventory: {response.status_code}")
+        return 0
 
 def connect_to_google_sheet(sheet_id):
-    print("Connecting to Google Sheet...")  # 진행 상태 출력
+    print("Connecting to Google Sheet...")
     credentials_path = "C:/Users/ellen/Downloads/credentials.json"
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/spreadsheets",
              "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
@@ -29,59 +66,67 @@ def connect_to_google_sheet(sheet_id):
     creds = ServiceAccountCredentials.from_json_keyfile_name(credentials_path, scope)
     client = gspread.authorize(creds)
     sheet = client.open_by_key(sheet_id).sheet1  # 파일 이름 대신 ID로 접근
-    print("Connected to Google Sheet successfully.")  # 연결 완료 메시지 출력
+    print("Connected to Google Sheet successfully.")
     return sheet
 
 def update_google_sheet(sheet, data):
-    print("Updating Google Sheet...")  # 진행 상태 출력
+    print("Updating Google Sheet...")
     updates = []
     for idx, item in enumerate(data, start=2):  # 시작 행 조정
-        print(f"Updating row {idx} for item: {item['name']}...")  # 각 항목 업데이트 상태 출력
+        print(f"Updating row {idx} for item: {item['name']}...")
         updates.append({'range': f"A{idx}", 'values': [[item['name']]]})
         updates.append({'range': f"B{idx}", 'values': [[item['price']]]})
         updates.append({'range': f"C{idx}", 'values': [[item['quantity']]]})
-        # 수식이 포함된 셀 업데이트 (이 부분이 핵심)
 
-    sheet.batch_update(updates)  # batch_update를 사용하여 여러 셀을 한 번에 업데이트
-    print("Google Sheet updated successfully.")  # 완료 메시지 출력
+    sheet.batch_update(updates)
+    print("Google Sheet updated successfully.")
 
-    print("Formula values updated.")  # 값 업데이트 완료 메시지
-    
-    # 구글 시트 수식 업데이트 (독립 처리)
 def update_formulas(sheet, data):
-    print("Updating formulas...")  # 상태 출력
+    print("Updating formulas...")
     for idx in range(2, len(data) + 2):  # 시작 행 조정
-        formula = f"=B{idx}*C{idx}"  # 수식 생성
-        print(f"Updating formula in D{idx}: {formula}")  # 디버깅
-        sheet.update(range_name=f"D{idx}", values=[[formula]])  # 수식만 독립적으로 업데이트
-    print("Formulas updated successfully.")  # 수식 업데이트 완료 메시지
+        formula = f"=B{idx}*C{idx}"
+        print(f"Updating formula in D{idx}: {formula}")
+        sheet.update_cell(idx, 4, formula)  # D열에 수식 개별적으로 업데이트
+    print("Formulas updated successfully.")
 
-# 실행 코드
 if __name__ == "__main__":
-    sheet_id = "1Jyb1W-sO5jiE-ESE3WLsb5rRfUTkXhwSDBHDzRSQJCE"  # Google Sheet ID
-    sheet = connect_to_google_sheet(sheet_id)
-    
-    items = [
-        {"name": "Trust of the Benefactor 2020", "quantity": 2},
-        {"name": "Immortal Treasure I 2020", "quantity": 5},
-        {"name": "Immortal Treasure II 2020", "quantity": 5},
-        {"name": "Immortal Treasure III 2020", "quantity": 5}
+    steam_id = "76561198030635599"  # 자신의 Steam ID
+    app_id = "570"  # Dota 2의 App ID
+    context_id = "2"  # Dota 2 보관함의 Context ID
+    target_item_names = [
+        "Trust of the Benefactor 2020",
+        "Immortal Treasure I 2020",
+        "Immortal Treasure II 2020",
+        "Immortal Treasure III 2020"
     ]
 
-    # 가격 크롤링 및 데이터 구성
-    print("Fetching item prices...")  # 가격 크롤링 시작
+    # 아이템 수량 가져오기
+    for target_item_name in target_item_names:  # 각 아이템에 대해 처리
+        quantity = get_item_quantity(steam_id, app_id, context_id, target_item_name)
+        print(f"Found {target_item_name} with quantity: {quantity}")
+    
+    # 반복문을 통해 각 아이템을 처리
     data = []
-    for item in items:
-        price = get_steam_item_price(appid=570, market_hash_name=item['name'])
+    for item_name in target_item_names:
+        # 각 아이템의 가격을 가져오기
+        price = get_steam_item_price(app_id, item_name)
         if price:
-            data.append({"name": item['name'], "price": price, "quantity": item['quantity']})
-    print("Item prices fetched.")  # 가격 크롤링 완료
+            # 가격을 구글 시트에 업데이트할 데이터에 추가
+            data.append({"name": item_name, "price": price, "quantity": quantity}) 
+
+    print(data) # 디버그
     
-    # 구글 시트 업데이트
+    # Google Sheet 업데이트
+    sheet_id = "1Jyb1W-sO5jiE-ESE3WLsb5rRfUTkXhwSDBHDzRSQJCE"  # Google Sheet ID
+    sheet = connect_to_google_sheet(sheet_id)
+
+
+    # 구글 시트에 아이템 정보 업데이트
     update_google_sheet(sheet, data)
-    # 수식 독립 업데이트
+
+    # 수식 업데이트
     update_formulas(sheet, data)
-    
-    print("Google Sheet updated successfully!")  # 모든 작업 완료 메시지
+
+    print("Google Sheet updated successfully!")
     
     input("\nPress Enter to exit...")

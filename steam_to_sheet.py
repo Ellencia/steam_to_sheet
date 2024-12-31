@@ -41,19 +41,20 @@ def update_google_sheet(sheet, data):
         updates.append({'range': f"B{idx}", 'values': [[item['price']]]})
         updates.append({'range': f"C{idx}", 'values': [[item['quantity']]]})
         # 수식이 포함된 셀 업데이트 (이 부분이 핵심)
-        updates.append({'range': f"D{idx}", 'values': [[f"=B{idx}*C{idx}"]]})
+
     sheet.batch_update(updates)  # batch_update를 사용하여 여러 셀을 한 번에 업데이트
     print("Google Sheet updated successfully.")  # 완료 메시지 출력
 
-    # 수식 계산 후 값 입력
-    for idx in range(2, len(data) + 2):  # 데이터 행을 순차적으로 처리
-        formula_value = sheet.cell(idx, 4).value  # D열 (수식 입력된 열)의 값을 가져옴
-        # 수식에서 작은 따옴표를 제거한 후 수식을 다시 계산하도록 설정
-        if formula_value.startswith("'"):
-            formula_value = formula_value[1:]  # 작은 따옴표 제거
-        sheet.update(f"D{idx}", formula_value)  # 수정된 수식을 입력
-
-    print("Formula values updated.")  # 수식 값 업데이트 완료 메시지
+    print("Formula values updated.")  # 값 업데이트 완료 메시지
+    
+    # 구글 시트 수식 업데이트 (독립 처리)
+def update_formulas(sheet, data):
+    print("Updating formulas...")  # 상태 출력
+    for idx in range(2, len(data) + 2):  # 시작 행 조정
+        formula = f"=B{idx}*C{idx}"  # 수식 생성
+        print(f"Updating formula in D{idx}: {formula}")  # 디버깅
+        sheet.update(range_name=f"D{idx}", values=[[formula]])  # 수식만 독립적으로 업데이트
+    print("Formulas updated successfully.")  # 수식 업데이트 완료 메시지
 
 # 실행 코드
 if __name__ == "__main__":
@@ -78,7 +79,9 @@ if __name__ == "__main__":
     
     # 구글 시트 업데이트
     update_google_sheet(sheet, data)
-
+    # 수식 독립 업데이트
+    update_formulas(sheet, data)
+    
     print("Google Sheet updated successfully!")  # 모든 작업 완료 메시지
     
     input("\nPress Enter to exit...")

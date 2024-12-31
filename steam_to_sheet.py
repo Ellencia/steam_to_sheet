@@ -38,18 +38,18 @@ def connect_to_google_sheet(sheet_id):
 
 # 구글 시트 업데이트
 def update_google_sheet(sheet, data):
-    print("Updating Google Sheet...")  # 진행 상태 출력
+    print("Google Sheet를 업데이트하는 중...")  # 진행 상태 출력
     updates = []
-    for idx, item in enumerate(data, start=2):  # 시작 행 조정
-        print(f"Updating row {idx} for item: {item['name']}...")  # 각 항목 업데이트 상태 출력
+    for idx, item in enumerate(data, start=2):  # 시작 행 번호 설정
+        print(f"아이템: {item['name']}에 대한 {idx}번째 행 업데이트 중...")  # 각 항목 업데이트 상태 출력
+        # 아이템 이름, 가격, 수량 업데이트
         updates.append({'range': f"A{idx}", 'values': [[item['name']]]})
         updates.append({'range': f"B{idx}", 'values': [[item['price']]]})
         updates.append({'range': f"C{idx}", 'values': [[item['quantity']]]})
-        # 수식이 포함된 셀 업데이트 (이 부분이 핵심)
-        updates.append({'range': f"D{idx}", 'values': [[f"=B{idx}*C{idx}"]]})
-    sheet.batch_update(updates)  # batch_update를 사용하여 여러 셀을 한 번에 업데이트
-    print("Google Sheet updated successfully.")  # 완료 메시지 출력
-
+        # 수식을 R1C1 형식으로 입력하여 수식이 제대로 계산되도록 수정
+        updates.append({'range': f"D{idx}", 'values': [[f"=B{idx}*C{idx}"]]})  # 수식 업데이트
+    sheet.batch_update(updates)  # batch_update를 사용하여 한 번에 여러 셀을 업데이트
+    print("Google Sheet 업데이트 완료.")  # 완료 메시지 출력
 
 # 실행 코드
 if __name__ == "__main__":

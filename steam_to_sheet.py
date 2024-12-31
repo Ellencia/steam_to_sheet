@@ -46,7 +46,7 @@ def update_google_sheet(sheet, data):
         updates.append({'range': f"B{idx}", 'values': [[item['price']]]})
         updates.append({'range': f"C{idx}", 'values': [[item['quantity']]]})
         # 수식이 포함된 셀 업데이트 (이 부분이 핵심)
-        updates.append({'range': f"D{idx}", 'values': [[f"=B{idx}*C{idx}"]]}). 
+        updates.append({'range': f"D{idx}", 'values': [[f"=B{idx}*C{idx}"]]})
     sheet.batch_update(updates)  # batch_update를 사용하여 여러 셀을 한 번에 업데이트
     print("Google Sheet updated successfully.")  # 완료 메시지 출력
 

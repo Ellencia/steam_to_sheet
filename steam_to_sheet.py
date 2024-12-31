@@ -51,6 +51,14 @@ def update_google_sheet(sheet, data):
     sheet.batch_update(updates)  # batch_update를 사용하여 한 번에 여러 셀을 업데이트
     print("Google Sheet 업데이트 완료.")  # 완료 메시지 출력
 
+    # ' 작은 따옴표 제거
+    for idx in range(2, len(data) + 2):  # 첫 번째 데이터 행부터 마지막 행까지
+        formula = sheet.cell(idx, 4).value  # D열 (수식 입력된 열)에서 값을 가져옴
+        if formula.startswith("'"):  # 수식이 작은 따옴표로 시작하면
+            formula = formula[1:]  # 첫 문자 (' )를 제거
+            sheet.update(f"D{idx}", formula)  # 수정된 값을 다시 입력
+    print("Google Sheet에서 작은 따옴표 제거 완료.")  # 작은 따옴표 제거 완료 메시지
+    
 # 실행 코드
 if __name__ == "__main__":
     sheet_id = "1Jyb1W-sO5jiE-ESE3WLsb5rRfUTkXhwSDBHDzRSQJCE"  # Google Sheet ID

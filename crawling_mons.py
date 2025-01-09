@@ -8,18 +8,21 @@ HEADERS = {
 }
 
 def get_redirect_links(base_url):
-    """HTML에서 중간 redirect.php 링크 추출"""
-    response = requests.get(base_url, headers=HEADERS, timeout=10)
-    soup = BeautifulSoup(response.text, "html.parser")
-    redirect_links = [
-        a_tag["href"]
-        for a_tag in soup.find_all("a", href=True)
-        if "redirect.php" in a_tag["href"]
-    ]
-    return redirect_links
+    for _ in range(3):  # 최대 3회 재시도
+        try:
+            response = requests.get(base_url, headers=HEADERS, timeout=10)
+            soup = BeautifulSoup(response.text, "html.parser")
+            return [
+                a_tag["href"]
+                for a_tag in soup.find_all("a", href=True)
+                if "redirect.php" in a_tag["href"]
+            ]
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching redirect links: {e}")
+            time.sleep(5)
+    return []
 
 def get_video_url(redirect_url):
-    """redirect 링크를 따라가 최종 비디오 URL 추출"""
     try:
         response = requests.get(redirect_url, headers=HEADERS, timeout=10, allow_redirects=True)
         if "video.twimg.com" in response.url:
@@ -41,9 +44,8 @@ def main():
             video_urls.append(video_url)
         else:
             print("Failed to fetch video URL.")
-        time.sleep(1)  # 요청 간 딜레이
+        time.sleep(1)
 
-    # 최종 비디오 URL 출력 또는 저장
     with open("video_links.txt", "w") as file:
         for url in video_urls:
             file.write(url + "\n")

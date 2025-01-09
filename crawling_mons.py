@@ -1,7 +1,8 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 import time
-import random
 
 # 기본 설정
 BASE_URL = "https://monsnode.com/search.php?search=ikejyo%20yuri"
@@ -15,9 +16,6 @@ def init_driver(headless=True):
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("start-maximized")
-    options.add_argument("disable-infobars")
-    options.add_argument("--disable-extensions")
     driver = webdriver.Chrome(options=options)
     return driver
 
@@ -27,9 +25,14 @@ def fetch_redirect_links(base_url):
     try:
         print("Loading page...")
         driver.get(base_url)
-        time.sleep(5)  # 페이지 로드 대기
+
+        # 페이지의 특정 요소가 로드될 때까지 대기
+        WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located((By.TAG_NAME, "a"))
+        )
 
         print("Fetching redirect links...")
+        # 모든 <a> 태그 가져오기
         links = driver.find_elements(By.TAG_NAME, "a")
         redirect_links = [
             link.get_attribute("href")
@@ -38,6 +41,9 @@ def fetch_redirect_links(base_url):
         ]
         print(f"Found {len(redirect_links)} redirect links.")
         return redirect_links
+    except Exception as e:
+        print(f"Error: {e}")
+        return []
     finally:
         driver.quit()
 
@@ -55,7 +61,7 @@ def main():
         print("No redirect links found.")
         return
 
-    # 비디오 URL 추출 (단순히 리다이렉트 링크를 저장하는 예제)
+    # 비디오 URL 추출
     video_urls = redirect_links
 
     # 비디오 URL 저장

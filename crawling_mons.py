@@ -1,56 +1,65 @@
-import requests
-from bs4 import BeautifulSoup
+from selenium import webdriver
+from selenium.webdriver.common.by import By
 import time
+import random
 
+# 기본 설정
 BASE_URL = "https://monsnode.com/search.php?search=ikejyo%20yuri"
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-}
+HEADLESS = False  # True로 설정하면 브라우저가 표시되지 않음
 
-def get_redirect_links(base_url):
-    for _ in range(3):  # 최대 3회 재시도
-        try:
-            response = requests.get(base_url, headers=HEADERS, timeout=10)
-            soup = BeautifulSoup(response.text, "html.parser")
-            return [
-                a_tag["href"]
-                for a_tag in soup.find_all("a", href=True)
-                if "redirect.php" in a_tag["href"]
-            ]
-        except requests.exceptions.RequestException as e:
-            print(f"Error fetching redirect links: {e}")
-            time.sleep(5)
-    return []
+# 크롬 드라이버 초기화 함수
+def init_driver(headless=True):
+    options = webdriver.ChromeOptions()
+    if headless:
+        options.add_argument("--headless")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("start-maximized")
+    options.add_argument("disable-infobars")
+    options.add_argument("--disable-extensions")
+    driver = webdriver.Chrome(options=options)
+    return driver
 
-def get_video_url(redirect_url):
+# 리다이렉트 링크 추출 함수
+def fetch_redirect_links(base_url):
+    driver = init_driver(HEADLESS)
     try:
-        response = requests.get(redirect_url, headers=HEADERS, timeout=10, allow_redirects=True)
-        if "video.twimg.com" in response.url:
-            return response.url
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching video URL: {e}")
-    return None
+        print("Loading page...")
+        driver.get(base_url)
+        time.sleep(5)  # 페이지 로드 대기
 
+        print("Fetching redirect links...")
+        links = driver.find_elements(By.TAG_NAME, "a")
+        redirect_links = [
+            link.get_attribute("href")
+            for link in links
+            if link.get_attribute("href") and "redirect.php" in link.get_attribute("href")
+        ]
+        print(f"Found {len(redirect_links)} redirect links.")
+        return redirect_links
+    finally:
+        driver.quit()
+
+# 비디오 URL 저장 함수
+def save_video_urls(video_urls, filename="video_links.txt"):
+    with open(filename, "w", encoding="utf-8") as file:
+        file.write("\n".join(video_urls))
+    print(f"Saved {len(video_urls)} video URLs to {filename}.")
+
+# 메인 함수
 def main():
-    redirect_links = get_redirect_links(BASE_URL)
-    print(f"Found {len(redirect_links)} redirect links.")
+    # 리다이렉트 링크 가져오기
+    redirect_links = fetch_redirect_links(BASE_URL)
+    if not redirect_links:
+        print("No redirect links found.")
+        return
 
-    video_urls = []
-    for idx, redirect in enumerate(redirect_links, start=1):
-        print(f"[{idx}] Processing: {redirect}")
-        video_url = get_video_url(redirect)
-        if video_url:
-            print(f"Video URL: {video_url}")
-            video_urls.append(video_url)
-        else:
-            print("Failed to fetch video URL.")
-        time.sleep(1)
+    # 비디오 URL 추출 (단순히 리다이렉트 링크를 저장하는 예제)
+    video_urls = redirect_links
 
-    with open("video_links.txt", "w") as file:
-        for url in video_urls:
-            file.write(url + "\n")
-
-    print(f"Saved {len(video_urls)} video URLs to video_links.txt")
+    # 비디오 URL 저장
+    save_video_urls(video_urls)
 
 if __name__ == "__main__":
     main()

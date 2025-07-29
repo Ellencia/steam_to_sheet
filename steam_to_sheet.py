@@ -91,6 +91,24 @@ def connect_to_google_sheet(sheet_id):
     print("Connected to Google Sheet successfully.")
     return sheet
 
+# Function to get exchange rate
+def get_exchange_rate():
+    # Replace YOUR_EXCHANGERATE_API_KEY with your actual API key
+    api_key = "eecf69a8652bc196cc7b53cf" 
+    url = f"https://v6.exchangerate-api.com/v6/{api_key}/latest/USD"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        if data["result"] == "success" and "conversion_rates" in data:
+            return data["conversion_rates"]["KRW"]
+        else:
+            print(f"Error fetching exchange rate: {data.get('error-type', 'Unknown error')}")
+            return None
+    except Exception as e:
+        print(f"Error fetching exchange rate: {e}")
+        return None
+
 # Modified function to append data
 def append_data_to_sheet(sheet, data):
     print("Appending data to Google Sheet...")
@@ -98,19 +116,31 @@ def append_data_to_sheet(sheet, data):
     # Get current timestamp
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
+    # Get exchange rate
+    exchange_rate = get_exchange_rate()
+    if exchange_rate is None:
+        print("Could not fetch exchange rate. KRW values will be 0.")
+        exchange_rate = 0 # Default to 0 if exchange rate cannot be fetched
+    
     rows_to_append = []
-    total_profit_for_run = 0 # Calculate total profit for this specific run
+    total_profit_for_run_usd = 0 # Total profit in USD for this run
+    total_profit_for_run_krw = 0 # Total profit in KRW for this run
     
     for item in data:
-        calculated_value = item['price'] * item['quantity']
+        calculated_value_usd = item['price'] * item['quantity']
+        calculated_value_krw = calculated_value_usd * exchange_rate
+        
         rows_to_append.append([
             timestamp, # Add timestamp to each row
             item['name'], 
             item['price'], 
             item['quantity'], 
-            calculated_value
+            calculated_value_usd,
+            exchange_rate, # Add exchange rate
+            calculated_value_krw # Add KRW value
         ])
-        total_profit_for_run += calculated_value
+        total_profit_for_run_usd += calculated_value_usd
+        total_profit_for_run_krw += calculated_value_krw
         
     # Append all item data rows
     if rows_to_append:
@@ -118,28 +148,13 @@ def append_data_to_sheet(sheet, data):
         print(f"Appended {len(rows_to_append)} item rows.")
     
     # Append a summary row for total profit of this run
-    sheet.append_row(['Total Profit for this run', '', '', '', total_profit_for_run])
-    print(f"Appended total profit for this run: {total_profit_for_run}")
+    # Note: Adjust column indices if you change the sheet structure
+    sheet.append_row(['Total Profit for this run (USD)', '', '', '', total_profit_for_run_usd, '', ''])
+    sheet.append_row(['Total Profit for this run (KRW)', '', '', '', '', '', total_profit_for_run_krw])
+    print(f"Appended total profit for this run: USD {total_profit_for_run_usd}, KRW {total_profit_for_run_krw}")
     
     print("Google Sheet updated successfully with appended data.")
-
-# These functions are no longer needed for appending, as calculations are done before appending
-# def update_formulas(sheet, data):
-#     print("Updating formulas...")
-#     for idx in range(2, len(data) + 2):  # 시작 행 조정
-#         formula = f"=B{idx}*C{idx}"
-#         # print(f"Updating formula in D{idx}: {formula}") # 디버그용
-#         sheet.update_cell(idx, 4, formula)  # D열에 수식 개별적으로 업데이트
-#     print("Formulas updated successfully.")
-    
-# def update_totP(sheet, data):
-#     print("Calculating total profit...")
-#     total_profit = sum(item['price'] * item['quantity'] for item in data) # 각 값들의 곱 합산
-#     sheet.update_cell(2, 5, total_profit)
-#     print(total_profit, "$")
-#     print("Calculating total profit done successfully.")
         
-
 if __name__ == "__main__":
     steam_id = "76561198030635599"  # 자신의 Steam ID
     app_id = "570"  # Dota 2의 App ID
@@ -177,11 +192,4 @@ if __name__ == "__main__":
     # 구글 시트에 아이템 정보 업데이트 (덮어쓰기 대신 추가)
     append_data_to_sheet(sheet, data)
 
-    # Removed the old update_formulas and update_totP calls
-    # update_formulas(sheet, data)
-    # update_totP(sheet, data)
-
     print("Google Sheet update process completed!")
-    
-    # Removed input to allow script to exit automatically for scheduling
-    # input("\nPress Enter to exit...")

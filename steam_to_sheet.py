@@ -6,6 +6,8 @@ import io
 import threading
 from oauth2client.service_account import ServiceAccountCredentials
 from tabulate import tabulate
+from pathlib import Path
+from datetime import datetime # Import datetime for timestamps
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
@@ -71,9 +73,17 @@ def get_item_quantity(steam_id, app_id, context_id, target_item_name):
 
 def connect_to_google_sheet(sheet_id):
     print("Connecting to Google Sheet...")
-    credentials_path = "C:/Users/ellen/Downloads/credentials.json"
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/spreadsheets",
-             "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
+    
+    # 현재 스크립트의 디렉토리 기준으로 credentials.json 경로 설정
+    BASE_DIR = Path(__file__).resolve().parent
+    credentials_path = BASE_DIR / "credentials.json"
+    
+    scope = [
+        "https://spreadsheets.google.com/feeds", 
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive.file", 
+        "https://www.googleapis.com/auth/drive"
+    ]
 
     creds = ServiceAccountCredentials.from_json_keyfile_name(credentials_path, scope)
     client = gspread.authorize(creds)
@@ -81,25 +91,54 @@ def connect_to_google_sheet(sheet_id):
     print("Connected to Google Sheet successfully.")
     return sheet
 
-def update_google_sheet(sheet, data):
-    print("Updating Google Sheet...")
-    updates = []
-    for idx, item in enumerate(data, start=2):  # 시작 행 조정
-        # print(f"Updating row {idx} for item: {item['name']}...") # 디버그용
-        updates.append({'range': f"A{idx}", 'values': [[item['name']]]})
-        updates.append({'range': f"B{idx}", 'values': [[item['price']]]})
-        updates.append({'range': f"C{idx}", 'values': [[item['quantity']]]})
+# Modified function to append data
+def append_data_to_sheet(sheet, data):
+    print("Appending data to Google Sheet...")
+    
+    # Get current timestamp
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    rows_to_append = []
+    total_profit_for_run = 0 # Calculate total profit for this specific run
+    
+    for item in data:
+        calculated_value = item['price'] * item['quantity']
+        rows_to_append.append([
+            timestamp, # Add timestamp to each row
+            item['name'], 
+            item['price'], 
+            item['quantity'], 
+            calculated_value
+        ])
+        total_profit_for_run += calculated_value
+        
+    # Append all item data rows
+    if rows_to_append:
+        sheet.append_rows(rows_to_append)
+        print(f"Appended {len(rows_to_append)} item rows.")
+    
+    # Append a summary row for total profit of this run
+    sheet.append_row(['Total Profit for this run', '', '', '', total_profit_for_run])
+    print(f"Appended total profit for this run: {total_profit_for_run}")
+    
+    print("Google Sheet updated successfully with appended data.")
 
-    sheet.batch_update(updates)
-    print("Google Sheet updated successfully.")
-
-def update_formulas(sheet, data):
-    print("Updating formulas...")
-    for idx in range(2, len(data) + 2):  # 시작 행 조정
-        formula = f"=B{idx}*C{idx}"
-        # print(f"Updating formula in D{idx}: {formula}") # 디버그용
-        sheet.update_cell(idx, 4, formula)  # D열에 수식 개별적으로 업데이트
-    print("Formulas updated successfully.")
+# These functions are no longer needed for appending, as calculations are done before appending
+# def update_formulas(sheet, data):
+#     print("Updating formulas...")
+#     for idx in range(2, len(data) + 2):  # 시작 행 조정
+#         formula = f"=B{idx}*C{idx}"
+#         # print(f"Updating formula in D{idx}: {formula}") # 디버그용
+#         sheet.update_cell(idx, 4, formula)  # D열에 수식 개별적으로 업데이트
+#     print("Formulas updated successfully.")
+    
+# def update_totP(sheet, data):
+#     print("Calculating total profit...")
+#     total_profit = sum(item['price'] * item['quantity'] for item in data) # 각 값들의 곱 합산
+#     sheet.update_cell(2, 5, total_profit)
+#     print(total_profit, "$")
+#     print("Calculating total profit done successfully.")
+        
 
 if __name__ == "__main__":
     steam_id = "76561198030635599"  # 자신의 Steam ID
@@ -127,6 +166,7 @@ if __name__ == "__main__":
             data.append({"name": item_name, "price": price, "quantity": quantity}) 
     
     stop_event.set() # 종료 이벤트
+    time.sleep(1)
     print() # 줄바꿈
     print(tabulate(data, headers="keys", tablefmt="fancy_grid"))
     
@@ -134,12 +174,14 @@ if __name__ == "__main__":
     sheet_id = "1Jyb1W-sO5jiE-ESE3WLsb5rRfUTkXhwSDBHDzRSQJCE"  # Google Sheet ID
     sheet = connect_to_google_sheet(sheet_id)
 
-    # 구글 시트에 아이템 정보 업데이트
-    update_google_sheet(sheet, data)
+    # 구글 시트에 아이템 정보 업데이트 (덮어쓰기 대신 추가)
+    append_data_to_sheet(sheet, data)
 
-    # 수식 업데이트
-    update_formulas(sheet, data)
+    # Removed the old update_formulas and update_totP calls
+    # update_formulas(sheet, data)
+    # update_totP(sheet, data)
 
-    print("Google Sheet updated successfully!")
+    print("Google Sheet update process completed!")
     
-    input("\nPress Enter to exit...")
+    # Removed input to allow script to exit automatically for scheduling
+    # input("\nPress Enter to exit...")

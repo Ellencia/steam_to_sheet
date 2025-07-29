@@ -101,7 +101,8 @@ def get_exchange_rate():
         response.raise_for_status()
         data = response.json()
         if data["result"] == "success" and "conversion_rates" in data:
-            return data["conversion_rates"]["KRW"]
+            # Round down the exchange rate
+            return int(data["conversion_rates"]["KRW"])
         else:
             print(f"Error fetching exchange rate: {data.get('error-type', 'Unknown error')}")
             return None
@@ -128,7 +129,8 @@ def append_data_to_sheet(sheet, data):
     
     for item in data:
         calculated_value_usd = item['price'] * item['quantity']
-        calculated_value_krw = calculated_value_usd * exchange_rate
+        # Round down the KRW value
+        calculated_value_krw = int(calculated_value_usd * exchange_rate)
         
         rows_to_append.append([
             timestamp, # Add timestamp to each row
@@ -147,10 +149,12 @@ def append_data_to_sheet(sheet, data):
         sheet.append_rows(rows_to_append)
         print(f"Appended {len(rows_to_append)} item rows.")
     
-    # Append a summary row for total profit of this run
-    # Note: Adjust column indices if you change the sheet structure
-    sheet.append_row(['Total Profit for this run (USD)', '', '', '', total_profit_for_run_usd, '', ''])
-    sheet.append_row(['Total Profit for this run (KRW)', '', '', '', '', '', total_profit_for_run_krw])
+    # Append a single summary row for total profit of this run
+    # Column 5 for USD total, Column 7 for KRW total
+    summary_row = ['', '', '', '', total_profit_for_run_usd, '', total_profit_for_run_krw]
+    summary_row[0] = 'Total Profit for this run' # Label for the summary row
+    sheet.append_row(summary_row)
+    
     print(f"Appended total profit for this run: USD {total_profit_for_run_usd}, KRW {total_profit_for_run_krw}")
     
     print("Google Sheet updated successfully with appended data.")
